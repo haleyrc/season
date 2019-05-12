@@ -12,12 +12,20 @@ import (
 	"github.com/pkg/errors"
 )
 
+// File is a single file to be renamed, with it's original file name and the
+// modified version. The file names do not include the path.
 type File struct {
 	Original string
 	Modified string
 }
 
-func Scan(base string) (Files, error) {
+// Scan looks for all files in a given directory that have an appropriate
+// extension and compiles them with transformed file names. The garbage
+// parameter can be used to strip some known quantity from each file name prior
+// to running the common normalization. This can be helpful when a set of files
+// contains some bits of information that should not appear in the final
+// filenames.
+func Scan(base string, garbage string) (Files, error) {
 	fs := Files{BasePath: base}
 
 	allFiles, err := filepath.Glob(filepath.Join(base, "*"))
@@ -43,9 +51,13 @@ func Scan(base string) (Files, error) {
 	n := len(files)
 	episodeNumberLength := len(strconv.Itoa(n))
 
+	var prexformers []transformer
+	if garbage != "" {
+		prexformers = append(prexformers, removeGarbage(garbage))
+	}
 	for _, file := range files {
 		dir, fn := filepath.Split(file)
-		mod := transform(fn, episodeNumberLength)
+		mod := transform(fn, episodeNumberLength, prexformers...)
 		if dir != "" {
 			currDir := filepath.Base(dir)
 			currDir = regexp.MustCompile(" ").ReplaceAllString(currDir, "_")
@@ -61,11 +73,15 @@ func Scan(base string) (Files, error) {
 	return fs, nil
 }
 
+// Files is a compilation of a path and all of the files to be transformed
+// within that path.
 type Files struct {
 	BasePath string
 	Files    []File
 }
 
+// Display prints information about the path and the files to be renamed, along
+// with their transformed name for review by the user.
 func (fs Files) Display(w io.Writer) {
 	fmt.Fprintf(w, " Path: %s\n", fs.BasePath)
 	fmt.Fprintln(w, " The following files will be renamed:")
@@ -78,6 +94,8 @@ func (fs Files) Display(w io.Writer) {
 	}
 }
 
+// Move moves each file from its original location to its modified location
+// within the same base path.
 func (fs Files) Move() []error {
 	var errs []error
 	for _, file := range fs.Files {
@@ -106,73 +124,6 @@ func findLongest(files []File) int {
 		}
 	}
 	return longest
-}
-
-type transformer func(s string) string
-
-// TODO (RCH): Take flags like --remove "Some garbage$" and create xformers from them
-func transform(input string, episodeNumberLength int) string {
-	ext := filepath.Ext(input)
-	fn := strings.TrimSuffix(input, ext)
-
-	for _, xformer := range []transformer{
-		removeGarbage(`- Meteor For Everyone$`),
-		removeGarbage(`Mastering Figma `),
-		removeGarbage(`^Level 2 Meteor 1\.4 \+ React `),
-		removeGarbage(`Level 1 Apollo Client with React$`),
-		removeGarbage(`Full-stack GraphQL with Apollo, Meteor & React-.*$`),
-		removeGarbage(`Better JavaScript$`),
-		removeGarbage(`VueJS For Everyone-.*$`),
-		replaceEscaped,
-		removeNonAlphaNumeric,
-		prependEpisode(episodeNumberLength),
-		strings.TrimSpace,
-		replaceSpaces,
-		removeDupeUnderscores,
-	} {
-		fn = xformer(fn)
-	}
-
-	return fn + ext
-}
-
-func replaceEscaped(s string) string {
-	return regexp.MustCompile(`%26`).ReplaceAllString(s, "And")
-}
-
-func removeGarbage(pattern string) transformer {
-	return func(s string) string {
-		return regexp.MustCompile(pattern).ReplaceAllString(s, "")
-	}
-}
-
-func removeDupeUnderscores(s string) string {
-	return regexp.MustCompile(`_+`).ReplaceAllString(s, "_")
-}
-
-func replaceSpaces(s string) string {
-	return regexp.MustCompile(" ").ReplaceAllString(s, "_")
-}
-
-func prependEpisode(l int) transformer {
-	return func(s string) string {
-		episode := regexp.MustCompile(`^\d*`).FindString(s)
-		s = strings.TrimPrefix(s, episode)
-
-		// We always want at least 2 digits, more only if there are
-		// more than 99 "episodes"
-		if len(episode) < 2 {
-			episode = "0" + episode
-		}
-		episode = strings.Repeat("0", l-len(episode)) + episode
-		prefix := fmt.Sprintf("S01E%s", episode)
-
-		return prefix + " " + s
-	}
-}
-
-func removeNonAlphaNumeric(s string) string {
-	return regexp.MustCompile(`[^a-zA-Z0-9_ ]`).ReplaceAllString(s, "")
 }
 
 func isVideo(file string) bool {
