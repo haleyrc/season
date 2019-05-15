@@ -2,7 +2,7 @@
 
 [`season`](https://github.com/haleyrc/season) is a utility for quickly renaming
 sets of files according to an opinionated set of rules with the end result that
-they are parseable by the [Plex Media Server(https://www.plex.tv/) as a TV show.
+they are parseable by the [Plex Media Server](https://www.plex.tv/) as a TV show.
 
 This utility was designed exclusively to help me with transforming a large
 number of online course videos I had downloaded that were named in entirely
