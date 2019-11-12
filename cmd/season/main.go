@@ -23,6 +23,11 @@ func main() {
 		false,
 		"Print usage information",
 	)
+	multi := flag.Bool(
+		"multi",
+		false,
+		"Directory contains multiple seasons in subdirectories",
+	)
 	help := flag.Bool(
 		"help",
 		false, "Print usage information",
@@ -40,21 +45,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	files, err := season.Scan(dir, *remove)
+	mods, err := season.ScanV2(
+		dir,
+		season.WithGarbage(*remove),
+		season.WithNested(*multi),
+	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: could not scan files: %s: %v", dir, err)
 		os.Exit(1)
 	}
 
 	fmt.Fprintln(os.Stderr)
-	files.Display(os.Stderr)
+	mods.Display(os.Stderr)
 
 	if !*confirm {
 		fmt.Fprintln(os.Stderr, " Run with --confirm to rename the files.")
 		os.Exit(0)
 	}
 
-	if errs := files.Move(); errs != nil {
+	if errs := mods.Move(); errs != nil {
 		fmt.Fprintf(os.Stderr, " Errors:\n\n")
 		fmt.Fprintln(os.Stderr, err)
 	}
