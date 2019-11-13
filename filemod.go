@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 )
 
@@ -78,6 +79,9 @@ func ScanV2(base string, opts ...Option) (FileMods, error) {
 	if err != nil {
 		return FileMods{}, errors.Wrap(err, "ScanV2")
 	}
+	if cfg.debug {
+		spew.Dump(mods)
+	}
 
 	var prexformers []transformer
 	if cfg.garbage != "" {
@@ -90,21 +94,46 @@ func ScanV2(base string, opts ...Option) (FileMods, error) {
 		// Default to setting number of episodes to number of total files, which
 		// is true in the flat case.
 		numEpisodes := len(mods.mods)
+		if cfg.debug {
+			fmt.Printf("num seasons : %d\n", numSeasons)
+			fmt.Printf("num episodes: %d\n", numEpisodes)
+		}
 		if cfg.nested {
 			// If we're in the nested case and have seasons, set it to the
 			// number of files for just that season.
 			numEpisodes = mods.seasons[mod.subdir]
+			if cfg.debug {
+				fmt.Println("Using seasons...")
+				fmt.Printf("num episodes: %d\n", numEpisodes)
+			}
 		}
-		for _, transformer := range []transformer{
-			removeGarbage(cfg.garbage),
-			replaceEscaped,
-			removeNonAlphaNumeric,
-			prependEpisode(numSeasons, numEpisodes),
-			trimSpace,
-			replaceSpaces,
-			removeDupeUnderscores,
+		if cfg.debug {
+			fmt.Println("Pre-transform:")
+			spew.Dump(mod)
+			fmt.Println()
+		}
+		for _, transformer := range []struct {
+			name string
+			f    transformer
+		}{
+			{"removing garbage", removeGarbage(cfg.garbage)},
+			{"replacing escaped", replaceEscaped},
+			{"removing nonalphanumeric", removeNonAlphaNumeric},
+			{"trimming space 1", trimSpace},
+			{"trim leading zeroes", trimZeroes},
+			{"prepending episode", prependEpisode(numSeasons, numEpisodes)},
+			{"trimming space 2", trimSpace},
+			{"replacing spaces", replaceSpaces},
+			{"removing dupe underscores", removeDupeUnderscores},
 		} {
-			transformer(mod)
+			if cfg.debug {
+				fmt.Printf("%s:\n", transformer.name)
+			}
+			transformer.f(mod)
+			if cfg.debug {
+				spew.Dump(mod)
+				fmt.Println()
+			}
 		}
 	}
 

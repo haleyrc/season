@@ -2,9 +2,12 @@ package season
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 type transformer func(m *FileMod)
@@ -30,8 +33,22 @@ func replaceSpaces(mod *FileMod) {
 	mod.toName = regexp.MustCompile(" ").ReplaceAllString(mod.toName, "_")
 }
 
+func trimZeroes(mod *FileMod) {
+	mod.toName = regexp.MustCompile("^0*").ReplaceAllString(mod.toName, "")
+}
+
 func prependEpisode(numSeasons, numEpisodes int) transformer {
 	return func(mod *FileMod) {
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Printf("Error during processing:\n")
+				fmt.Printf("\tCan't prepend episode: %s\n", r)
+				fmt.Printf("\tNumber of seasons:  %d\n", numSeasons)
+				fmt.Printf("\tNumber of episodes: %d\n", numEpisodes)
+				spew.Dump(mod)
+				os.Exit(1)
+			}
+		}()
 		episode := regexp.MustCompile(`^\d*`).FindString(mod.toName)
 		orig := strings.TrimPrefix(mod.toName, episode)
 
@@ -59,7 +76,7 @@ func pad(s string, min, max int) string {
 }
 
 func removeNonAlphaNumeric(mod *FileMod) {
-	mod.toName = regexp.MustCompile(`[^a-zA-Z0-9_ ]`).ReplaceAllString(mod.toName, "")
+	mod.toName = regexp.MustCompile(`[^a-zA-Z0-9_ ]`).ReplaceAllString(mod.toName, " ")
 }
 
 func trimSpace(mod *FileMod) {

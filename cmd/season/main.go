@@ -28,6 +28,11 @@ func main() {
 		false,
 		"Directory contains multiple seasons in subdirectories",
 	)
+	debug := flag.Bool(
+		"debug",
+		false,
+		"Output debugging information",
+	)
 	help := flag.Bool(
 		"help",
 		false, "Print usage information",
@@ -49,6 +54,7 @@ func main() {
 		dir,
 		season.WithGarbage(*remove),
 		season.WithNested(*multi),
+		season.WithDebug(*debug),
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: could not scan files: %s: %v", dir, err)
